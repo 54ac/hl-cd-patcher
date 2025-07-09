@@ -36,10 +36,10 @@ int applyPatches(const int filesize, const int fileChecksum, unsigned char *buff
 
     if (patch.filesize != filesize ||
         patch.checksum != fileChecksum ||
-        buffer[patch.offset] != patch.oldByte)
+        buffer[patch.offset] != byteTypes[patch.byteTypeIndex].oldByte)
       continue;
 
-    buffer[patch.offset] = patch.newByte;
+    buffer[patch.offset] = byteTypes[patch.byteTypeIndex].newByte;
     patched = 1;
     printf("Half-Life %s (build %d) - %s patch applied\n",
            patch.name, patch.buildNumber, patchTypes[patch.patchTypeIndex]);
@@ -93,7 +93,7 @@ int main() {
   if (rename(inputFileName, bakFileName) != 0)
     handleError(NULL, buffer, "Cannot rename original file");
 
-  // verifies checksum of exe - regenerated automatically on game launch
+  // dat file verifies checksum of exe - regenerated automatically on game launch
   const char *datFileName = INPUT_FILENAME ".dat";
   FILE *datFile = fopen(datFileName, "r");
   if (datFile) {

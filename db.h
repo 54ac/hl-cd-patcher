@@ -2,10 +2,22 @@
 #define DB_H
 
 typedef enum {
-  CD_CHECK,
-  TIMEBOMB
+  TIMEBOMB,
+  CD_CHECK
 } PatchType;
 extern const char *patchTypes[];
+
+typedef enum {
+  TIMEBOMB_BYTE,
+  CD_OLD_CHECK_BYTE,
+  CD_NEW_CHECK_BYTE
+} ByteType;
+
+typedef struct {
+  unsigned char oldByte;
+  unsigned char newByte;
+} ByteStruct;
+extern const ByteStruct byteTypes[];
 
 typedef struct {
   const char *name;
@@ -14,8 +26,7 @@ typedef struct {
   int checksum;
   PatchType patchTypeIndex;
   int offset;
-  unsigned char oldByte;
-  unsigned char newByte;
+  ByteType byteTypeIndex;
 } Database;
 extern const Database patches[];
 extern const int patchesCount;
