@@ -1,6 +1,6 @@
 #include "db.h"
 
-const char *patchTypes[] = {"timebomb", "CD check"};
+const char *const patchTypes[] = {"timebomb", "CD check"};
 const ByteStruct byteTypes[] = {{0x22, 0x6B}, {0x75, 0xEB}, {0x85, 0x89}};
 
 // version name, build number, filesize, checksum, patch type, offset, byte pair

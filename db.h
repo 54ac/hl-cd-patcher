@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #ifndef DB_H
 #define DB_H
 
@@ -5,7 +7,7 @@ typedef enum {
   TIMEBOMB,
   CD_CHECK
 } PatchType;
-extern const char *patchTypes[];
+extern const char *const patchTypes[];
 
 typedef enum {
   TIMEBOMB_BYTE,
@@ -22,10 +24,10 @@ extern const ByteStruct byteTypes[];
 typedef struct {
   const char *name;
   int buildNumber;
-  int filesize;
+  size_t filesize;
   int checksum;
   PatchType patchTypeIndex;
-  int offset;
+  size_t offset;
   ByteType byteTypeIndex;
 } Database;
 extern const Database patches[];

@@ -1,53 +1,32 @@
+#include "hl-cd-patcher.h"
 #include "db.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #define INPUT_FILENAME "hl"
 #define MAX_FILE_SIZE 1500000
 
-void exitPrompt() {
-  printf("Press any key to exit");
-  getchar();
-}
-
-void handleError(FILE *file, unsigned char *buffer, const char *message) {
-  if (file)
-    fclose(file);
-  if (buffer)
-    free(buffer);
-  fprintf(stderr, "Error: %s\n", message);
-  exitPrompt();
-  exit(EXIT_FAILURE);
-}
-
-// sum of bytes in file
-int calcChecksum(const int filesize, unsigned char *buffer) {
-  int fileChecksum = 0;
-  for (int i = 0; i < filesize; i++)
-    fileChecksum += buffer[i];
-
-  return fileChecksum;
-}
-
-int applyPatches(const int filesize, const int fileChecksum, unsigned char *buffer) {
-  int patched = 0;
+static inline bool applyPatch(const size_t filesize, const int fileChecksum, unsigned char *buffer) {
+  bool patched = false;
   for (int i = 0; i < patchesCount; i++) {
     const Database patch = patches[i];
 
     if (patch.filesize != filesize ||
         patch.checksum != fileChecksum ||
+        patch.offset < 0 ||
+        patch.offset >= filesize ||
         buffer[patch.offset] != byteTypes[patch.byteTypeIndex].oldByte)
       continue;
 
     buffer[patch.offset] = byteTypes[patch.byteTypeIndex].newByte;
-    patched = 1;
+    patched = true;
     printf("Half-Life %s (build %d) - %s patch applied\n",
            patch.name, patch.buildNumber, patchTypes[patch.patchTypeIndex]);
 
     if (patched && i != patchesCount - 1 && patches[i + 1].buildNumber != patch.buildNumber)
       break;
   }
-
   return patched;
 }
 
@@ -59,26 +38,32 @@ int main() {
   const char *bakFileName = INPUT_FILENAME ".bak";
   FILE *bakFileCheck = fopen(bakFileName, "r");
   if (bakFileCheck)
-    handleError(bakFileCheck, NULL, "Backup file already exists");
+    handleError(bakFileCheck, NULL, ERR_FILE_EXISTS);
 
   const char *inputFileName = INPUT_FILENAME ".exe";
   FILE *inputFile = fopen(inputFileName, "rb");
   if (!inputFile)
-    handleError(NULL, NULL, "Input file not found");
+    handleError(NULL, NULL, ERR_FILE_NOT_FOUND);
 
-  fseek(inputFile, 0, SEEK_END);
-  const size_t filesize = ftell(inputFile);
-  if (filesize > MAX_FILE_SIZE) // for edge cases - keep filesize as an int
-    handleError(inputFile, NULL, "Input file too large");
+  if (fseek(inputFile, 0, SEEK_END) != 0)
+    handleError(inputFile, NULL, ERR_FILE_READ);
+
+  long filepos = ftell(inputFile);
+  if (filepos < 0)
+    handleError(inputFile, NULL, ERR_FILE_READ);
+  size_t filesize = (size_t)filepos;
+
+  if (filesize > MAX_FILE_SIZE)
+    handleError(inputFile, NULL, ERR_FILE_SIZE);
 
   rewind(inputFile);
 
   unsigned char *buffer = malloc(filesize);
   if (!buffer)
-    handleError(inputFile, NULL, "Memory allocation failed");
+    handleError(inputFile, NULL, ERR_FILE_READ);
 
   if (fread(buffer, 1, filesize, inputFile) != filesize)
-    handleError(inputFile, buffer, "File read error");
+    handleError(inputFile, buffer, ERR_FILE_READ);
 
   fclose(inputFile);
 
@@ -86,12 +71,11 @@ int main() {
 
   // printf("File checksum: %d\n\n", fileChecksum); // for making new patches
 
-  int patched = applyPatches(filesize, fileChecksum, buffer);
-  if (!patched)
-    handleError(NULL, buffer, "Unknown version or already patched");
+  if (!applyPatch(filesize, fileChecksum, buffer))
+    handleError(NULL, buffer, ERR_UNKNOWN_VER);
 
   if (rename(inputFileName, bakFileName) != 0)
-    handleError(NULL, buffer, "Cannot rename original file");
+    handleError(NULL, buffer, ERR_FILE_RENAME);
 
   // dat file verifies checksum of exe - regenerated automatically on game launch
   const char *datFileName = INPUT_FILENAME ".dat";
@@ -101,15 +85,15 @@ int main() {
     if (remove(datFileName) == 0)
       printf("\n%s deleted successfully\n", datFileName);
     else
-      handleError(NULL, buffer, "File delete error");
+      handleError(NULL, buffer, ERR_FILE_DELETE);
   }
 
   FILE *outputFile = fopen(inputFileName, "wb");
   if (!outputFile)
-    handleError(NULL, buffer, "Output file could not be opened");
+    handleError(NULL, buffer, ERR_FILE_WRITE);
 
   if (fwrite(buffer, 1, filesize, outputFile) != filesize)
-    handleError(outputFile, buffer, "File write error");
+    handleError(outputFile, buffer, ERR_FILE_WRITE);
 
   fclose(outputFile);
   free(buffer);
